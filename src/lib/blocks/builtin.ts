@@ -215,6 +215,57 @@ export const productBlock = defineBlock({
  * they were paid for. A string the seller wrote is a string the buyer
  * reads back unchanged.
  */
+/**
+ * HireMe is the public profile entry point for interview scheduling.
+ *
+ * The block owns presentation and routing references only. Interview types,
+ * availability rules, and candidate bookings remain in the HireMe domain.
+ */
+export const hireMeBlock = defineBlock({
+  type: "hireme",
+  name: "HireMe interview",
+  description:
+    "Share an interview booking link backed by HireMe scheduling.",
+  capabilities: [
+    "shareable",
+    "qr",
+    "searchable",
+    "exportable",
+    "schedulable",
+    "seo",
+  ],
+  schema: z.object({
+    interviewTypeId: z.string().max(120),
+    slug: z
+      .string()
+      .max(120)
+      .refine(
+        (value) =>
+          value === "" ||
+          /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value),
+        "Slug must contain lowercase letters, numbers, and hyphens",
+      ),
+    jobId: z.string().max(120).optional(),
+    title: z.string().min(1).max(160),
+    description: z.string().max(500).optional(),
+    durationMinutes: z.number().int().min(5).max(480),
+    locationLabel: z.string().max(160).optional(),
+    buttonLabel: z.string().min(1).max(80),
+    active: z.boolean(),
+  }),
+  defaults: () => ({
+    interviewTypeId: "",
+    slug: "",
+    jobId: undefined,
+    title: "Schedule an interview",
+    description:
+      "Choose an available time for your interview.",
+    durationMinutes: 30,
+    locationLabel: "Online",
+    buttonLabel: "Choose an interview time",
+    active: true,
+  }),
+});
 export const bookingBlock = defineBlock({
   type: "booking",
   name: "Paid booking",

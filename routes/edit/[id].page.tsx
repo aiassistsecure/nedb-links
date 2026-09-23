@@ -101,6 +101,16 @@ function blockSummary(b: Block): string {
         ? `${str(d.vpa)} · ₹${amt}`
         : `${str(d.vpa)} · payer chooses`;
     }
+    case "hireme": {
+      if (!str(d.interviewTypeId)) {
+        return "connect an interview type to publish this link";
+      }
+
+      const duration = Number(d.durationMinutes) || 30;
+      return d.active === false
+        ? `${duration} min · bookings paused`
+        : `${duration} min · accepting interviews`;
+    }
     case "booking": {
       const slots = Array.isArray(d.slots) ? d.slots.length : 0;
       if (!str(d.vpa)) return "add your UPI ID to take bookings";
