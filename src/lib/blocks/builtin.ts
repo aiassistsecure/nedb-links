@@ -251,6 +251,26 @@ export const hireMeBlock = defineBlock({
     durationMinutes: z.number().int().min(5).max(480),
     locationLabel: z.string().max(160).optional(),
     buttonLabel: z.string().min(1).max(80),
+    confirmationTitle: z.string().min(1).max(160),
+    confirmationMessage: z.string().min(1).max(500),
+    timezone: z.string().min(1).max(100),
+    availableDays: z
+      .array(z.number().int().min(0).max(6))
+      .min(1)
+      .max(7),
+    availabilityStart: z
+      .string()
+      .regex(/^\d{2}:\d{2}$/),
+    availabilityEnd: z
+      .string()
+      .regex(/^\d{2}:\d{2}$/),
+    slotStepMinutes: z.number().int().min(5).max(120),
+    minimumNoticeMinutes: z
+      .number()
+      .int()
+      .min(0)
+      .max(43_200),
+    bookingHorizonDays: z.number().int().min(1).max(90),
     active: z.boolean(),
   }),
   defaults: () => ({
@@ -263,7 +283,17 @@ export const hireMeBlock = defineBlock({
     durationMinutes: 30,
     locationLabel: "Online",
     buttonLabel: "Choose an interview time",
+    confirmationTitle: "Your interview is confirmed",
+    confirmationMessage:
+      "You’re booked to speak with the hiring manager. We sent your interview details to the email address you provided.",
     active: true,
+    timezone: "UTC",
+    availableDays: [1, 2, 3, 4, 5],
+    availabilityStart: "09:00",
+    availabilityEnd: "17:00",
+    slotStepMinutes: 30,
+    minimumNoticeMinutes: 720,
+    bookingHorizonDays: 21,
   }),
 });
 export const bookingBlock = defineBlock({
