@@ -10,6 +10,7 @@
     "dev:web": "portal dev",
     "dev:api": "node dev-api.mjs",
     "preview": "portal preview",
+    "build": "portal build",
     "serve": "portal serve",
     "start": "NODE_ENV=production tsx server.ts",
     "audit": "portal audit",
