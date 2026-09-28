@@ -252,7 +252,7 @@ test("the zero-JS entry form: real url-encoded POSTs, not JSON — this is what 
     await formPost(`/r/${rid}/enter`, { name: "Dana Real", phone: "+1 407 555 0099", email: "dana@probe.test" })
   ).text();
   assert.equal(enterHtml.includes("Something&#39;s missing") || enterHtml.includes("Something's missing"), false, "the entry the visitor typed must be READ — not reported missing");
-  assert.ok(enterHtml.includes("Check your inbox") || enterHtml.includes("check your inbox"), "real submission reaches the code-sent step");
+  assert.ok(enterHtml.includes("You're in"), "real submission issues a ticket immediately");
 
   const code = codeFor("dana@probe.test");
   const pendingMatch = lastMailTo("dana@probe.test"); // sanity: mail actually fired for this entry
