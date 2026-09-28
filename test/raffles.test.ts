@@ -254,20 +254,12 @@ test("the zero-JS entry form: real url-encoded POSTs, not JSON — this is what 
   assert.equal(enterHtml.includes("Something&#39;s missing") || enterHtml.includes("Something's missing"), false, "the entry the visitor typed must be READ — not reported missing");
   assert.ok(enterHtml.includes("You're in"), "real submission issues a ticket immediately");
 
-  const code = codeFor("dana@probe.test");
-  const pendingMatch = lastMailTo("dana@probe.test"); // sanity: mail actually fired for this entry
-  assert.ok(pendingMatch.length > 0);
-
-  // Pull the pendingId the same way a browser would have it: from the
-  // hidden field the server just rendered.
-  const pendingIdMatch = enterHtml.match(/name="pendingId" value="([^"]+)"/);
-  assert.ok(pendingIdMatch, "confirm form carries the pending id");
-
-  const confirmHtml = await (
-    await formPost(`/r/${rid}/confirm`, { pendingId: pendingIdMatch![1], code })
-  ).text();
-  assert.ok(confirmHtml.includes("You're in"), "real form-encoded confirm actually redeems a ticket");
-  const ticketMatch = confirmHtml.match(/class="win mono">(tkt_[a-f0-9]+)</);
+  const ticketMatch = enterHtml.match(/class="win mono">(tkt_[a-f0-9]+)</);
+  assert.ok(ticketMatch, "a real ticket id renders back to the browser");
+  assert.ok(
+    lastMailTo("dana@probe.test").includes(ticketMatch[1]),
+    "ticket receipt carries the same ticket id",
+  );
   assert.ok(ticketMatch, "a real ticket id renders back to the browser");
 
   // And it's really persisted — the owner's leads reflect the same entry.
