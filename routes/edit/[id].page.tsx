@@ -985,6 +985,201 @@ function BlockFields({
               }
             />
           </div>
+
+          <div className="border-t border-line pt-4">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-fg-muted">
+              Availability
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="mb-2 block text-xs font-medium text-fg-muted">
+                  Available days
+                </label>
+                <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+                  {[
+                    ["Sun", 0],
+                    ["Mon", 1],
+                    ["Tue", 2],
+                    ["Wed", 3],
+                    ["Thu", 4],
+                    ["Fri", 5],
+                    ["Sat", 6],
+                  ].map(([label, day]) => {
+                    const availableDays = Array.isArray(d.availableDays)
+                      ? d.availableDays.map(Number).filter((value) => Number.isInteger(value))
+                      : [1, 2, 3, 4, 5];
+                    const selected = availableDays.includes(Number(day));
+
+                    return (
+                      <button
+                        key={String(day)}
+                        type="button"
+                        aria-pressed={selected}
+                        className={
+                          selected
+                            ? "rounded-xl border border-accent bg-accent/10 px-2 py-2 text-xs font-semibold text-accent-soft"
+                            : "rounded-xl border border-line px-2 py-2 text-xs font-semibold text-fg-muted hover:border-accent"
+                        }
+                        onClick={() => {
+                          const next = selected
+                            ? availableDays.filter((value) => value !== Number(day))
+                            : [...availableDays, Number(day)].sort((a, b) => a - b);
+
+                          if (next.length > 0) {
+                            onChange({ ...d, availableDays: next });
+                          }
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-1.5 text-[11px] leading-relaxed text-fg-subtle">
+                  At least one day must remain available.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-fg-muted">
+                    Start time
+                  </label>
+                  <input
+                    className="field"
+                    type="time"
+                    value={str(d.availabilityStart) || "09:00"}
+                    onChange={(event) =>
+                      onChange({
+                        ...d,
+                        availabilityStart: event.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-fg-muted">
+                    End time
+                  </label>
+                  <input
+                    className="field"
+                    type="time"
+                    value={str(d.availabilityEnd) || "17:00"}
+                    onChange={(event) =>
+                      onChange({
+                        ...d,
+                        availabilityEnd: event.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-fg-muted">
+                    Timezone
+                  </label>
+                  <input
+                    className="field"
+                    value={str(d.timezone) || "UTC"}
+                    placeholder="America/New_York"
+                    maxLength={100}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    onChange={(event) =>
+                      onChange({
+                        ...d,
+                        timezone: event.target.value.trim() || "UTC",
+                      })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-fg-muted">
+                    Slot spacing
+                  </label>
+                  <select
+                    className="field"
+                    value={Number(d.slotStepMinutes) || 30}
+                    onChange={(event) =>
+                      onChange({
+                        ...d,
+                        slotStepMinutes: Number(event.target.value),
+                      })
+                    }
+                  >
+                    <option value={5}>Every 5 minutes</option>
+                    <option value={10}>Every 10 minutes</option>
+                    <option value={15}>Every 15 minutes</option>
+                    <option value={30}>Every 30 minutes</option>
+                    <option value={45}>Every 45 minutes</option>
+                    <option value={60}>Every hour</option>
+                    <option value={90}>Every 90 minutes</option>
+                    <option value={120}>Every 2 hours</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-fg-muted">
+                    Minimum notice
+                  </label>
+                  <select
+                    className="field"
+                    value={Number(d.minimumNoticeMinutes) || 0}
+                    onChange={(event) =>
+                      onChange({
+                        ...d,
+                        minimumNoticeMinutes: Number(event.target.value),
+                      })
+                    }
+                  >
+                    <option value={0}>No minimum</option>
+                    <option value={60}>1 hour</option>
+                    <option value={120}>2 hours</option>
+                    <option value={360}>6 hours</option>
+                    <option value={720}>12 hours</option>
+                    <option value={1440}>24 hours</option>
+                    <option value={2880}>48 hours</option>
+                    <option value={10080}>7 days</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-fg-muted">
+                    Booking horizon
+                  </label>
+                  <select
+                    className="field"
+                    value={Number(d.bookingHorizonDays) || 21}
+                    onChange={(event) =>
+                      onChange({
+                        ...d,
+                        bookingHorizonDays: Number(event.target.value),
+                      })
+                    }
+                  >
+                    <option value={7}>1 week ahead</option>
+                    <option value={14}>2 weeks ahead</option>
+                    <option value={21}>3 weeks ahead</option>
+                    <option value={30}>30 days ahead</option>
+                    <option value={45}>45 days ahead</option>
+                    <option value={60}>60 days ahead</option>
+                    <option value={90}>90 days ahead</option>
+                  </select>
+                </div>
+              </div>
+
+              <p className="text-[11px] leading-relaxed text-fg-subtle">
+                These settings feed the same HireMe scheduler that renders the public booking page. Existing confirmed interviews still block overlapping slots.
+              </p>
+            </div>
+          </div>
+
           <div className="border-t border-line pt-4">
             <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-fg-muted">
               Confirmation screen
