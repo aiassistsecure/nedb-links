@@ -19,6 +19,7 @@ const activeIdentityClaims = new Set<string>();
 
 interface PublicInterviewType {
   identityId: string;
+  handle: string;
   interviewTypeId: string;
   slug: string;
   title: string;
@@ -131,6 +132,7 @@ function blockToInterviewType(
 
   return {
     identityId: manifest.identityId,
+    handle: manifest.handle,
     interviewTypeId:
       text(data.interviewTypeId) || block.id,
     slug,
@@ -907,6 +909,8 @@ hireme.post(
           endsAt: booking.endsAt,
           locationLabel:
             interviewType.locationLabel,
+          timezone: interviewType.timezone,
+          profileUrl: `/${interviewType.handle}`,
           candidateName:
             booking.candidateName,
           candidateEmail:
