@@ -37,6 +37,8 @@ export interface LinksConfig {
   smtpPass?: string;
   /** RFC 5322 From — e.g. "NEDB Links <no-reply@ne-db.com>". */
   mailFrom?: string;
+  /** Operations inbox notified when a HireMe interview is confirmed. */
+  adminEmail?: string;
   /** imgbb API key — enables avatar/logo uploads. Absent = URL-only. */
   imgbbKey?: string;
   /** Running nedbd instance. All state lives there. */
