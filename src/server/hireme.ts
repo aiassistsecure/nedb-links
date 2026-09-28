@@ -6,9 +6,12 @@ import { calculateAvailableSlots } from "../lib/hireme/availability";
 import { expandAvailability } from "../lib/hireme/recurrence";
 import type { AvailabilityRule } from "../lib/hireme/types";
 import { authOf, requireUser } from "./auth";
+import { config } from "./config";
 import { db } from "./db";
+import { hireMeBookingEmail } from "./emails";
 import { hasRole } from "./grants";
 import { getManifest } from "./identities";
+import { sendMail } from "./mailer";
 import { wrap } from "./util";
 
 const BOOKINGS_COLLECTION = "hireme_bookings";
@@ -848,6 +851,49 @@ hireme.post(
         documentId,
         booking,
       );
+
+      const notificationBase = {
+        title: interviewType.title,
+        candidateName: booking.candidateName,
+        candidateEmail: booking.candidateEmail,
+        candidatePhone: booking.candidatePhone,
+        startsAt: booking.startsAt,
+        endsAt: booking.endsAt,
+        timezone: interviewType.timezone,
+        locationLabel: interviewType.locationLabel,
+      };
+
+      // The booking is already durable. Notification failure must never
+      // make a successfully claimed slot look failed to the candidate.
+      void sendMail(
+        hireMeBookingEmail({
+          ...notificationBase,
+          to: booking.candidateEmail,
+          recipient: "candidate",
+        }),
+      ).catch((err) =>
+        console.warn(
+          `[links] HireMe candidate confirmation failed: ${
+            err instanceof Error ? err.message : err
+          }`,
+        ),
+      );
+
+      if (config.adminEmail) {
+        void sendMail(
+          hireMeBookingEmail({
+            ...notificationBase,
+            to: config.adminEmail,
+            recipient: "admin",
+          }),
+        ).catch((err) =>
+          console.warn(
+            `[links] HireMe admin notification failed: ${
+              err instanceof Error ? err.message : err
+            }`,
+          ),
+        );
+      }
 
       res.status(201).json({
         booking: {
