@@ -12,6 +12,7 @@
     "preview": "portal preview",
     "build": "portal build",
     "migrate:daemon": "tsx scripts/migrate-daemon-to-embedded.ts",
+    "migrate:missed": "tsx scripts/migrate-missed-daemon-collections.ts",
     "serve": "portal serve",
     "start": "NODE_ENV=production tsx server.ts",
     "audit": "portal audit",
