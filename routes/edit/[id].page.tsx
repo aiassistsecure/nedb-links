@@ -79,6 +79,44 @@ function str(v: unknown): string {
   return typeof v === "string" ? v : "";
 }
 
+function supportedTimeZones(): string[] {
+  const intl = Intl as typeof Intl & {
+    supportedValuesOf?: (key: "timeZone") => string[];
+  };
+  const zones = intl.supportedValuesOf?.("timeZone") ?? [];
+  const all = zones.includes("UTC") ? zones : ["UTC", ...zones];
+
+  if (all.length > 1) return all;
+
+  return [
+    "UTC",
+    "America/New_York",
+    "America/Chicago",
+    "America/Denver",
+    "America/Los_Angeles",
+    "America/Phoenix",
+    "America/Anchorage",
+    "Pacific/Honolulu",
+    "America/Toronto",
+    "America/Vancouver",
+    "America/Mexico_City",
+    "America/Sao_Paulo",
+    "Europe/London",
+    "Europe/Paris",
+    "Europe/Berlin",
+    "Europe/Madrid",
+    "Europe/Rome",
+    "Africa/Johannesburg",
+    "Asia/Dubai",
+    "Asia/Kolkata",
+    "Asia/Singapore",
+    "Asia/Tokyo",
+    "Asia/Seoul",
+    "Australia/Sydney",
+    "Pacific/Auckland",
+  ];
+}
+
 /** A human summary line for a block card header. */
 function blockSummary(b: Block): string {
   const d = b.data;
@@ -868,6 +906,11 @@ function BlockFields({
       const interviewTypeId = str(
         d.interviewTypeId,
       );
+      const timezone = str(d.timezone) || "UTC";
+      const timezones = supportedTimeZones();
+      const timezoneOptions = timezones.includes(timezone)
+        ? timezones
+        : [timezone, ...timezones];
 
       return (
         <div className="space-y-4">
@@ -1080,21 +1123,25 @@ function BlockFields({
                   <label className="mb-1 block text-xs font-medium text-fg-muted">
                     Timezone
                   </label>
-                  <input
+                  <select
                     className="field"
-                    value={str(d.timezone) || "UTC"}
-                    placeholder="America/New_York"
-                    maxLength={100}
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
+                    value={timezone}
                     onChange={(event) =>
                       onChange({
                         ...d,
-                        timezone: event.target.value.trim() || "UTC",
+                        timezone: event.target.value,
                       })
                     }
-                  />
+                  >
+                    {timezoneOptions.map((zone) => (
+                      <option key={zone} value={zone}>
+                        {zone}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-fg-subtle">
+                    Uses standard IANA timezones and handles daylight saving time automatically.
+                  </p>
                 </div>
               </div>
 
