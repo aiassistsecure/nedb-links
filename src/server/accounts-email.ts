@@ -367,10 +367,20 @@ function magicId(principal: string): string {
  *  accounts only. Re-requesting replaces the previous token. */
 accountsEmail.post("/magic", wrap(async (req, res) => {
   const body = z.object({ email: z.string().trim().toLowerCase().email().max(254) }).safeParse(req.body);
+  if (!body.success) {
+    console.warn("[links] magic request rejected: invalid email payload");
+  }
   if (body.success) {
     const principal = emailPrincipal(body.data.email);
+    console.info(`[links] magic request accepted: principal=${principal}`);
     const account = await getAccount(principal);
-    if (account?.verifiedAt && magicThrottleOk(principal)) {
+    if (!account) {
+      console.info(`[links] magic request ignored: account not found principal=${principal}`);
+    } else if (!account.verifiedAt) {
+      console.info(`[links] magic request ignored: account unverified principal=${principal}`);
+    } else if (!magicThrottleOk(principal)) {
+      console.warn(`[links] magic request throttled: principal=${principal}`);
+    } else {
       const now = Date.now();
       const doc: MagicToken = {
         kind: "magic_login",
@@ -384,15 +394,33 @@ accountsEmail.post("/magic", wrap(async (req, res) => {
       await db.put(COLLECTIONS.challenges, magicId(principal), doc as unknown as Record<string, unknown>, {
         evidence: `magic login for ${principal}`,
       });
-      sendMail(
-        magicLoginEmail({
-          to: account.email,
-          loginUrl: `${origin()}/magic?token=${doc.linkToken}`,
-          code: doc.code,
-        }),
-      ).catch((err) =>
-        console.error(`[links] magic email failed: ${err instanceof Error ? err.message : err}`),
+      console.info(
+        `[links] magic challenge persisted: principal=${principal} expiresAt=${doc.expiresAt}`,
       );
+
+      const mail = magicLoginEmail({
+        to: account.email,
+        loginUrl: `${origin()}/magic?token=${doc.linkToken}`,
+        code: doc.code,
+      });
+
+      console.info(
+        `[links] magic email dispatching: principal=${principal} recipient=${account.email}`,
+      );
+
+      sendMail(mail)
+        .then(() =>
+          console.info(
+            `[links] magic email sent: principal=${principal} recipient=${account.email}`,
+          ),
+        )
+        .catch((err) =>
+          console.error(
+            `[links] magic email failed: principal=${principal} recipient=${account.email} error=${
+              err instanceof Error ? err.message : err
+            }`,
+          ),
+        );
     }
   }
   res.json({ ok: true });
