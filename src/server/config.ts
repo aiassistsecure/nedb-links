@@ -113,6 +113,7 @@ export function loadConfig(): LinksConfig {
     smtpUser: process.env.SMTP_USER || undefined,
     smtpPass: process.env.SMTP_PASS || undefined,
     mailFrom: process.env.MAIL_FROM || undefined,
+    adminEmail: process.env.ADMIN_EMAIL || undefined,
     imgbbKey: process.env.IMGBB_API_KEY || undefined,
     nedbUrl: process.env.NEDB_URL || "http://127.0.0.1:7070",
     nedbDb: process.env.NEDB_DB || "links",
