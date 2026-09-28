@@ -8,19 +8,67 @@
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { NedbCore } from "nedb-engine";
-import type {
-  BatchOperation,
-  BatchResult,
-  DeleteOptions,
-  DeleteResult,
-  HistoryEntry,
-  PutOptions,
-  PutResult,
-  QueryOptions,
-} from "nedb-engine-client";
 import { config } from "./config";
 
 type Document = Record<string, unknown>;
+
+interface PutOptions {
+  clientId?: string;
+  nonce?: string | number | bigint;
+  idem?: string;
+  causedBy?: unknown;
+  validFrom?: unknown;
+  validTo?: unknown;
+  evidence?: unknown;
+  confidence?: unknown;
+}
+
+interface PutResult {
+  ok: boolean;
+  doc: Document;
+  seq: number;
+  head: string;
+}
+
+interface DeleteOptions {
+  clientId?: string;
+  nonce?: string | number | bigint;
+  idem?: string;
+}
+
+interface DeleteResult {
+  ok: boolean;
+  seq: number;
+  head: string;
+}
+
+interface QueryOptions {
+  [key: string]: unknown;
+}
+
+type HistoryEntry = Document;
+
+type BatchOperation =
+  | {
+      op: "put";
+      collection: string;
+      id: string;
+      doc: object;
+      options?: PutOptions;
+    }
+  | {
+      op: "delete";
+      collection: string;
+      id: string;
+      options?: DeleteOptions;
+    };
+
+interface BatchResult {
+  ok: boolean;
+  results: Array<PutResult | DeleteResult>;
+  seq: number;
+  head: string;
+}
 
 function parseDocument(
   value: string | null,
@@ -85,10 +133,10 @@ class EmbeddedNedb {
     };
   }
 
-  async put(
+  async put<T extends object>(
     collection: string,
     id: string,
-    document: Document,
+    document: T,
     options: PutOptions = {},
   ): Promise<PutResult> {
     const stored = parseDocument(
