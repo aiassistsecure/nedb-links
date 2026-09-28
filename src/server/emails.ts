@@ -723,16 +723,29 @@ export function hireMeBookingEmail(opts: {
   timezone: string;
   locationLabel?: string;
 }): OutgoingMail {
-  const start = new Date(opts.startsAt).toLocaleString("en-US", {
+  const startDate = new Date(opts.startsAt);
+  const endDate = new Date(opts.endsAt);
+  const date = startDate.toLocaleDateString("en-US", {
     timeZone: opts.timezone,
-    dateStyle: "full",
-    timeStyle: "short",
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
   });
-  const end = new Date(opts.endsAt).toLocaleTimeString("en-US", {
+  const startTime = startDate.toLocaleTimeString("en-US", {
     timeZone: opts.timezone,
-    timeStyle: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
   });
-  const when = `${start} – ${end} (${opts.timezone})`;
+  const endTime = endDate.toLocaleTimeString("en-US", {
+    timeZone: opts.timezone,
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+  const when = `${date} at ${startTime} – ${endTime}`;
+  const timezoneDetail = opts.timezone;
   const location = opts.locationLabel || "Location details to follow";
   const isAdmin = opts.recipient === "admin";
 
@@ -750,7 +763,7 @@ export function hireMeBookingEmail(opts: {
         { center: true },
       ),
       `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:18px 0;">
-        <tr><td style="padding:10px 0;font-family:${FONT};font-size:14px;color:${MUTED};"><b style="color:${INK};">When</b><br/>${esc(when)}</td></tr>
+        <tr><td style="padding:10px 0;font-family:${FONT};font-size:14px;color:${MUTED};"><b style="color:${INK};">When</b><br/>${esc(when)}<br/><span style="font-size:12px;color:${MUTED};">${esc(timezoneDetail)}</span></td></tr>
         <tr><td style="padding:10px 0;font-family:${FONT};font-size:14px;color:${MUTED};"><b style="color:${INK};">Where</b><br/>${esc(location)}</td></tr>
         ${isAdmin ? `<tr><td style="padding:10px 0;font-family:${FONT};font-size:14px;color:${MUTED};"><b style="color:${INK};">Candidate</b><br/>${esc(opts.candidateName)} · ${esc(opts.candidateEmail)}${opts.candidatePhone ? ` · ${esc(opts.candidatePhone)}` : ""}</td></tr>` : ""}
       </table>`,
@@ -778,6 +791,7 @@ export function hireMeBookingEmail(opts: {
       "",
       `Interview: ${opts.title}`,
       `When:      ${when}`,
+      `Timezone:  ${timezoneDetail}`,
       `Where:     ${location}`,
       ...(isAdmin
         ? [
