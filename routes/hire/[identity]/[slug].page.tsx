@@ -27,6 +27,8 @@ interface Confirmation {
   startsAt: string;
   endsAt: string;
   locationLabel?: string;
+  timezone: string;
+  profileUrl: string;
   candidateName: string;
   candidateEmail: string;
   status: "confirmed";
@@ -61,6 +63,61 @@ function timeLabel(value: string): string {
     minute: "2-digit",
     timeZoneName: "short",
   }).format(new Date(value));
+}
+
+function maskEmail(value: string): string {
+  const [local, domain] = value.split("@");
+  if (!local || !domain) return value;
+  const visible = local.slice(0, 1);
+  return `${visible}${"•".repeat(Math.max(3, Math.min(8, local.length - 1)))}@${domain}`;
+}
+
+function icsDate(value: string): string {
+  return new Date(value)
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}Z$/, "Z");
+}
+
+function downloadCalendar(confirmation: Confirmation): void {
+  const esc = (value: string): string =>
+    value
+      .replaceAll("\\", "\\\\")
+      .replaceAll("\n", "\\n")
+      .replaceAll(",", "\\,")
+      .replaceAll(";", "\\;");
+
+  const body = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//OurLynx//HireMe//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${esc(confirmation.id)}@hireme.ourlynx`,
+    `DTSTAMP:${icsDate(new Date().toISOString())}`,
+    `DTSTART:${icsDate(confirmation.startsAt)}`,
+    `DTEND:${icsDate(confirmation.endsAt)}`,
+    `SUMMARY:${esc(confirmation.title)}`,
+    `DESCRIPTION:${esc("HireMe interview confirmation")}`,
+    ...(confirmation.locationLabel
+      ? [`LOCATION:${esc(confirmation.locationLabel)}`]
+      : []),
+    "STATUS:CONFIRMED",
+    "END:VEVENT",
+    "END:VCALENDAR",
+    "",
+  ].join("\r\n");
+
+  const blob = new Blob([body], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "hireme-interview.ics";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 export default function HireMeBookingPage(): React.ReactElement {
@@ -222,67 +279,109 @@ export default function HireMeBookingPage(): React.ReactElement {
   if (confirmation) {
     return (
       <main className="min-h-screen bg-bg px-5 py-12 text-fg">
-        <section className="mx-auto max-w-lg rounded-3xl border border-line bg-surface p-7 shadow-xl">
-          <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 text-2xl text-emerald-600">
-            ✓
+        <section className="mx-auto max-w-lg overflow-hidden rounded-3xl border border-line bg-surface shadow-xl">
+          <div className="border-b border-line bg-emerald-500/5 px-7 py-6">
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 text-2xl text-emerald-500">
+              ✓
+            </div>
+
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-fg-muted">
+              HireMe by OurLynx
+            </p>
+
+            <h1 className="mt-2 text-3xl font-bold">
+              {confirmation.confirmationTitle}
+            </h1>
+
+            <p className="mt-3 whitespace-pre-line text-fg-muted">
+              {confirmation.confirmationMessage}
+            </p>
           </div>
 
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-fg-muted">
-            HireMe by OurLynx
-          </p>
-
-          <h1 className="mt-2 text-3xl font-bold">
-            {confirmation.confirmationTitle}
-          </h1>
-
-          <p className="mt-3 whitespace-pre-line text-fg-muted">
-            {confirmation.confirmationMessage}
-          </p>
-
-          <dl className="mt-6 space-y-4 rounded-2xl border border-line bg-surface-subtle p-5">
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
-                Interview
-              </dt>
-              <dd className="mt-1 font-medium">
-                {confirmation.title}
-              </dd>
-            </div>
-
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
-                Date
-              </dt>
-              <dd className="mt-1 font-medium">
-                {dateLabel(confirmation.startsAt)}
-              </dd>
-            </div>
-
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
-                Time
-              </dt>
-              <dd className="mt-1 font-medium">
-                {timeLabel(confirmation.startsAt)}
-              </dd>
-            </div>
-
-            {confirmation.locationLabel ? (
-              <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
-                  Location
-                </dt>
-                <dd className="mt-1 font-medium">
-                  {confirmation.locationLabel}
-                </dd>
+          <div className="p-7">
+            <div className="rounded-2xl border border-line bg-surface-subtle p-5">
+              <div className="flex items-start justify-between gap-4 border-b border-line pb-4">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-fg-subtle">
+                    Appointment
+                  </p>
+                  <p className="mt-1 text-lg font-bold">
+                    {confirmation.title}
+                  </p>
+                </div>
+                <span className="rounded-full border border-line px-2.5 py-1 text-[11px] font-semibold text-fg-muted">
+                  Confirmed
+                </span>
               </div>
-            ) : null}
-          </dl>
 
-          <p className="mt-5 text-sm leading-relaxed text-fg-muted">
-            Confirmation is recorded for{" "}
-            {confirmation.candidateEmail}.
-          </p>
+              <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+                    Date
+                  </dt>
+                  <dd className="mt-1 font-medium">
+                    {dateLabel(confirmation.startsAt)}
+                  </dd>
+                </div>
+
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+                    Time
+                  </dt>
+                  <dd className="mt-1 font-medium">
+                    {timeLabel(confirmation.startsAt)}
+                  </dd>
+                  <p className="mt-0.5 text-[11px] text-fg-subtle">
+                    Scheduler timezone: {confirmation.timezone}
+                  </p>
+                </div>
+
+                {confirmation.locationLabel ? (
+                  <div className="sm:col-span-2">
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+                      Location
+                    </dt>
+                    <dd className="mt-1 font-medium">
+                      {confirmation.locationLabel}
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+            </div>
+
+            <div className="mt-5 grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => downloadCalendar(confirmation)}
+                className="rounded-full bg-accent px-5 py-3 text-sm font-bold text-white"
+              >
+                Add to calendar
+              </button>
+
+              <a
+                href={confirmation.profileUrl}
+                className="rounded-full border border-line px-5 py-3 text-center text-sm font-bold text-fg hover:border-accent"
+              >
+                Back to profile
+              </a>
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-line bg-surface-subtle px-4 py-3">
+              <p className="text-sm text-fg-muted">
+                Confirmation sent to{" "}
+                <span className="font-medium text-fg">
+                  {maskEmail(confirmation.candidateEmail)}
+                </span>
+              </p>
+              <p className="mt-1 break-all font-mono text-[11px] text-fg-subtle">
+                Booking ID: {confirmation.id}
+              </p>
+            </div>
+
+            <p className="mt-4 text-xs leading-relaxed text-fg-subtle">
+              Need to change something? Contact the organizer using the details on their profile.
+            </p>
+          </div>
         </section>
       </main>
     );
