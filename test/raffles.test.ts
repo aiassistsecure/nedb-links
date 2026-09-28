@@ -117,7 +117,7 @@ test("mint: saving a giveaway block publishes the commitment before any entry", 
   assert.ok(page.includes("gvw"), "holographic card class present");
 });
 
-test("enter: verified email → ticket; duplicates and overflow bounce", async () => {
+test("enter: email → immediate ticket; duplicates and overflow bounce", async () => {
   // Entrant one.
   const e1 = await post(`/api/raffles/${raffleId}/enter`, { name: "Ana", phone: "+1 407 555 0001", email: "ana@probe.test" });
   assert.equal(e1.status, 200);
