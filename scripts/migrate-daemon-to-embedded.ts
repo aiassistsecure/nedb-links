@@ -6,11 +6,11 @@ import { NedbCore } from "nedb-engine";
 type JsonObject = Record<string, unknown>;
 
 interface SourceSummary {
-  name: string;
+  name?: string;
   seq: number;
   head: string;
-  rows: number;
-  collections: Record<string, number>;
+  rows?: number;
+  collections: string[] | Record<string, number>;
 }
 
 interface Args {
@@ -133,11 +133,12 @@ async function sourceSummary(args: Args): Promise<SourceSummary> {
 async function readCollection(
   client: NedbClient,
   collection: string,
-  expectedCount: number,
+  expectedCount: number | undefined,
   pageSize: number,
 ): Promise<JsonObject[]> {
   const rows: JsonObject[] = [];
-  for (let offset = 0; offset < expectedCount; offset += pageSize) {
+
+  for (let offset = 0; ; offset += pageSize) {
     const page = await client.query(
       `FROM ${collection} LIMIT ${pageSize} OFFSET ${offset}`,
     );
@@ -145,12 +146,23 @@ async function readCollection(
     if (page.length < pageSize) break;
   }
 
-  if (rows.length !== expectedCount) {
+  if (expectedCount !== undefined && rows.length !== expectedCount) {
     throw new Error(
       `collection ${collection}: daemon reported ${expectedCount} rows but query returned ${rows.length}`,
     );
   }
+
   return rows;
+}
+
+function collectionEntries(
+  summary: SourceSummary,
+): Array<[string, number | undefined]> {
+  if (Array.isArray(summary.collections)) {
+    return summary.collections.map((collection) => [collection, undefined]);
+  }
+
+  return Object.entries(summary.collections);
 }
 
 async function main(): Promise<void> {
@@ -175,19 +187,20 @@ async function main(): Promise<void> {
   }
 
   const summary = await sourceSummary(args);
+  const collections = collectionEntries(summary);
   console.log(
-    `  daemon: seq=${summary.seq} head=${summary.head} rows=${summary.rows} collections=${Object.keys(summary.collections).length}`,
+    `  daemon: seq=${summary.seq} head=${summary.head} rows=${summary.rows ?? "n/a"} collections=${collections.length}`,
   );
 
   const sourceRows = new Map<string, JsonObject[]>();
-  for (const [collection, expectedCount] of Object.entries(summary.collections)) {
+  for (const [collection, expectedCount] of collections) {
     const rows = await readCollection(client, collection, expectedCount, args.pageSize);
     sourceRows.set(collection, rows);
     console.log(`  read ${collection}: ${rows.length}`);
   }
 
   const totalRead = [...sourceRows.values()].reduce((sum, rows) => sum + rows.length, 0);
-  if (totalRead !== summary.rows) {
+  if (summary.rows !== undefined && totalRead !== summary.rows) {
     throw new Error(
       `source total mismatch: summary=${summary.rows}, fetched=${totalRead}`,
     );
