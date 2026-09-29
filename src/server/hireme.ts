@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { Router } from "express";
 
 import type { Block, IdentityManifest } from "../lib/identity";
@@ -15,6 +15,7 @@ import { sendMail } from "./mailer";
 import { wrap } from "./util";
 
 const BOOKINGS_COLLECTION = "hireme_bookings";
+const ACCESS_COLLECTION = "hireme_access";
 const activeIdentityClaims = new Set<string>();
 
 interface PublicInterviewType {
@@ -56,6 +57,13 @@ interface HireMeBookingDocument {
   status: "confirmed" | "cancelled" | "completed" | "no_show";
   createdAt: string;
 }
+interface HireMeAccessDocument {
+  identityId: string;
+  slug: string;
+  token: string;
+  createdAt: string;
+  rotatedAt: string;
+}
 
 export const hireme = Router();
 
@@ -96,6 +104,80 @@ function bookingDocumentId(
     .update(`${identityId}\u0000${slug}\u0000${startsAt}`)
     .digest("hex")
     .slice(0, 32)}`;
+}
+function accessDocumentId(
+  identityId: string,
+  slug: string,
+): string {
+  return `hma_${createHash("sha256")
+    .update(`${identityId}\u0000${slug}`)
+    .digest("hex")
+    .slice(0, 32)}`;
+}
+
+function newAccessToken(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+async function accessRecord(
+  identityId: string,
+  slug: string,
+): Promise<HireMeAccessDocument | null> {
+  const value = await db.get(
+    ACCESS_COLLECTION,
+    accessDocumentId(identityId, slug),
+  );
+
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Partial<HireMeAccessDocument>;
+  if (
+    record.identityId !== identityId ||
+    record.slug !== slug ||
+    typeof record.token !== "string" ||
+    !record.token
+  ) {
+    return null;
+  }
+
+  return record as HireMeAccessDocument;
+}
+
+async function configuredHireMeSlugExists(
+  identityId: string,
+  slug: string,
+): Promise<boolean> {
+  const manifest = await getManifest(identityId);
+  return Boolean(
+    manifest?.blocks.some(
+      (block) =>
+        block.type === "hireme" &&
+        text(block.data.slug) === slug,
+    ),
+  );
+}
+
+async function validAccessKey(
+  identityId: string,
+  slug: string,
+  candidateKey: string,
+): Promise<boolean> {
+  if (!candidateKey) return false;
+  const record = await accessRecord(identityId, slug);
+  if (!record) return false;
+
+  const candidate = Buffer.from(candidateKey);
+  const expected = Buffer.from(record.token);
+  return (
+    candidate.length === expected.length &&
+    timingSafeEqual(candidate, expected)
+  );
+}
+
+function requestAccessKey(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function blockToInterviewType(
@@ -658,6 +740,89 @@ hireme.get(
   }),
 );
 hireme.get(
+  "/identities/:identityId/access/:slug",
+  requireUser,
+  wrap(async (req, res) => {
+    const identityId = String(req.params.identityId);
+    const slug = String(req.params.slug);
+    const auth = authOf(res);
+
+    if (
+      !auth ||
+      !(await hasRole(identityId, auth, "editor"))
+    ) {
+      res.status(403).json({
+        error: "You do not have permission to manage this interview link.",
+      });
+      return;
+    }
+
+    if (!(await configuredHireMeSlugExists(identityId, slug))) {
+      res.status(404).json({
+        error: "Save this HireMe block before creating its private link.",
+      });
+      return;
+    }
+
+    const record = await accessRecord(identityId, slug);
+    res.json({
+      inviteUrl: record
+        ? `/hire/${encodeURIComponent(identityId)}/${encodeURIComponent(slug)}?key=${encodeURIComponent(record.token)}`
+        : null,
+      rotatedAt: record?.rotatedAt ?? null,
+    });
+  }),
+);
+
+hireme.post(
+  "/identities/:identityId/access/:slug/rotate",
+  requireUser,
+  wrap(async (req, res) => {
+    const identityId = String(req.params.identityId);
+    const slug = String(req.params.slug);
+    const auth = authOf(res);
+
+    if (
+      !auth ||
+      !(await hasRole(identityId, auth, "editor"))
+    ) {
+      res.status(403).json({
+        error: "You do not have permission to rotate this interview link.",
+      });
+      return;
+    }
+
+    if (!(await configuredHireMeSlugExists(identityId, slug))) {
+      res.status(404).json({
+        error: "Save this HireMe block before creating its private link.",
+      });
+      return;
+    }
+
+    const existing = await accessRecord(identityId, slug);
+    const now = new Date().toISOString();
+    const record: HireMeAccessDocument = {
+      identityId,
+      slug,
+      token: newAccessToken(),
+      createdAt: existing?.createdAt ?? now,
+      rotatedAt: now,
+    };
+
+    await db.put(
+      ACCESS_COLLECTION,
+      accessDocumentId(identityId, slug),
+      record,
+    );
+
+    res.status(existing ? 200 : 201).json({
+      inviteUrl: `/hire/${encodeURIComponent(identityId)}/${encodeURIComponent(slug)}?key=${encodeURIComponent(record.token)}`,
+      rotatedAt: record.rotatedAt,
+    });
+  }),
+);
+
+hireme.get(
   "/types/:identityId/:slug",
   wrap(async (req, res) => {
     const identityId = String(
@@ -678,6 +843,13 @@ hireme.get(
       return;
     }
 
+    const key = requestAccessKey(req.query.key);
+    if (!(await validAccessKey(identityId, slug, key))) {
+      res.status(404).json({
+        error: "This interview invitation is unavailable.",
+      });
+      return;
+    }
     res.json({ interviewType });
   }),
 );
@@ -703,6 +875,13 @@ hireme.get(
       return;
     }
 
+    const key = requestAccessKey(req.query.key);
+    if (!(await validAccessKey(identityId, slug, key))) {
+      res.status(404).json({
+        error: "This interview invitation is unavailable.",
+      });
+      return;
+    }
     res.json({
       slots: await availableSlots(
         interviewType,
@@ -732,6 +911,13 @@ hireme.post(
       return;
     }
 
+    const key = requestAccessKey(req.query.key);
+    if (!(await validAccessKey(identityId, slug, key))) {
+      res.status(404).json({
+        error: "This interview invitation is unavailable.",
+      });
+      return;
+    }
     const candidateName = text(
       req.body?.name,
     );
