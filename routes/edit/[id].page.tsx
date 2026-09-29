@@ -31,6 +31,7 @@ import { BackgroundPicker } from "../../src/components/BackgroundPicker";
 import { Nav } from "../../src/components/Nav";
 import { Gate } from "../../src/components/Gate";
 import { Footer } from "../../src/components/Footer";
+import { HireMeAccessControls } from "../../src/components/HireMeAccessControls";
 import { PremiumWelcomeModal } from "../../src/components/PremiumModals";
 import { SalesPanel } from "../../src/components/SalesPanel";
 import "../../src/lib/blocks/builtin";
@@ -1306,7 +1307,7 @@ function BlockFields({
 
               <div>
                 <label className="mb-1 block text-xs font-medium text-fg-muted">
-                  Public booking slug
+                  Private booking slug
                 </label>
                 <input
                   className="field"
@@ -1327,7 +1328,7 @@ function BlockFields({
                   }}
                 />
                 <p className="mt-1 text-[11px] leading-relaxed text-fg-subtle">
-                  Use lowercase letters, numbers, and hyphens.
+                  Used in the private HireMe URL. Use lowercase letters, numbers, and hyphens.
                 </p>
               </div>
 
@@ -1352,6 +1353,8 @@ function BlockFields({
               </div>
             </div>
           </div>
+
+          <HireMeAccessControls slug={slug} />
 
           <div className="border-t border-line pt-4">
             <div className="rounded-2xl border border-line bg-surface-subtle p-4">

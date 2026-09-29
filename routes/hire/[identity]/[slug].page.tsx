@@ -125,6 +125,11 @@ export default function HireMeBookingPage(): React.ReactElement {
     routeParameters,
     [],
   );
+  const inviteKey = useMemo(
+    () =>
+      new URLSearchParams(window.location.search).get("key")?.trim() ?? "",
+    [],
+  );
   const [interviewType, setInterviewType] =
     useState<InterviewType | null>(null);
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -148,10 +153,11 @@ export default function HireMeBookingPage(): React.ReactElement {
       const base = `/api/hireme/types/${encodeURIComponent(
         identityId,
       )}/${encodeURIComponent(slug)}`;
+      const keyQuery = `?key=${encodeURIComponent(inviteKey)}`;
       const [typeResponse, slotsResponse] =
         await Promise.all([
-          fetch(base),
-          fetch(`${base}/slots`),
+          fetch(`${base}${keyQuery}`),
+          fetch(`${base}/slots${keyQuery}`),
         ]);
 
       const typePayload = (await typeResponse.json()) as {
@@ -202,7 +208,7 @@ export default function HireMeBookingPage(): React.ReactElement {
 
   useEffect(() => {
     void load();
-  }, [identityId, slug]);
+  }, [identityId, slug, inviteKey]);
 
   const slotsByDate = useMemo(() => {
     const groups = new Map<string, Slot[]>();
@@ -234,7 +240,7 @@ export default function HireMeBookingPage(): React.ReactElement {
       const response = await fetch(
         `/api/hireme/types/${encodeURIComponent(
           identityId,
-        )}/${encodeURIComponent(slug)}/bookings`,
+        )}/${encodeURIComponent(slug)}/bookings?key=${encodeURIComponent(inviteKey)}`,
         {
           method: "POST",
           headers: {
