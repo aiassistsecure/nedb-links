@@ -314,6 +314,10 @@ export const COLLECTIONS = {
   /** Tier-1 product sales: a buyer's CLAIM that they paid, pending the
    *  seller's confirmation against their own bank. Never a receipt. */
   purchases: "purchases",
+  /** HireMe confirmed interview records. */
+  hireMeBookings: "hireme_bookings",
+  /** Private reusable HireMe access links, never part of public manifests. */
+  hireMeAccess: "hireme_access",
 } as const;
 
 /**
