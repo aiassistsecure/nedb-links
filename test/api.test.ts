@@ -309,6 +309,159 @@ test("publish flips status and the profile goes live", async () => {
   assert.ok(html.includes("/go/"), "click tracking wired");
 });
 
+test("HireMe private links gate every candidate surface and rotate cleanly", async () => {
+  const currentResponse = await fetch(`${base}/api/identities/${identityId}`, {
+    headers: authed(),
+  });
+  assert.equal(currentResponse.status, 200);
+  const current = (await currentResponse.json()) as {
+    manifest: { blocks: Array<Record<string, unknown>> };
+  };
+
+  const hireMeTitle = "Private CI Interview";
+  const slug = "private-ci-interview";
+  const blocks = [
+    ...current.manifest.blocks.filter(
+      (block) => block.type !== "hireme",
+    ),
+    {
+      id: "blk_hireme_private_ci",
+      type: "hireme",
+      order: current.manifest.blocks.length,
+      data: {
+        interviewTypeId: "ci-private",
+        slug,
+        title: hireMeTitle,
+        description: "Invite-only CI booking surface.",
+        durationMinutes: 30,
+        locationLabel: "CI Room",
+        buttonLabel: "Choose a time",
+        confirmationTitle: "CI interview confirmed",
+        confirmationMessage: "Your CI interview is booked.",
+        timezone: "UTC",
+        availableDays: [0, 1, 2, 3, 4, 5, 6],
+        availabilityStart: "00:00",
+        availabilityEnd: "23:59",
+        slotStepMinutes: 30,
+        minimumNoticeMinutes: 0,
+        bookingHorizonDays: 7,
+        active: true,
+      },
+    },
+  ];
+
+  const save = await fetch(`${base}/api/identities/${identityId}`, {
+    method: "PUT",
+    headers: authed(),
+    body: JSON.stringify({ blocks }),
+  });
+  assert.equal(save.status, 200, "HireMe config saves");
+
+  const publicHtml = await (await fetch(`${base}/smoketest`)).text();
+  assert.equal(
+    publicHtml.includes(hireMeTitle),
+    false,
+    "HireMe does not render on the public profile",
+  );
+
+  const typeBase = `${base}/api/hireme/types/${encodeURIComponent(
+    identityId,
+  )}/${encodeURIComponent(slug)}`;
+
+  const missingKey = await fetch(typeBase);
+  assert.equal(missingKey.status, 404, "interview details require a private key");
+
+  const accessBefore = await fetch(
+    `${base}/api/hireme/identities/${encodeURIComponent(
+      identityId,
+    )}/access/${encodeURIComponent(slug)}`,
+    { headers: authed() },
+  );
+  assert.equal(accessBefore.status, 200);
+  const before = (await accessBefore.json()) as {
+    inviteUrl: string | null;
+  };
+  assert.equal(before.inviteUrl, null, "no private link exists until created");
+
+  const create = await fetch(
+    `${base}/api/hireme/identities/${encodeURIComponent(
+      identityId,
+    )}/access/${encodeURIComponent(slug)}/rotate`,
+    {
+      method: "POST",
+      headers: authed(),
+    },
+  );
+  assert.equal(create.status, 201, "first rotation creates the reusable link");
+  const created = (await create.json()) as {
+    inviteUrl: string;
+  };
+  const firstInvite = new URL(created.inviteUrl, base);
+  const firstKey = firstInvite.searchParams.get("key") ?? "";
+  assert.ok(firstKey.length >= 32, "private key has high entropy");
+
+  const details = await fetch(
+    `${typeBase}?key=${encodeURIComponent(firstKey)}`,
+  );
+  assert.equal(details.status, 200, "correct key unlocks interview details");
+
+  const slotsResponse = await fetch(
+    `${typeBase}/slots?key=${encodeURIComponent(firstKey)}`,
+  );
+  assert.equal(slotsResponse.status, 200, "correct key unlocks slots");
+  const slotsPayload = (await slotsResponse.json()) as {
+    slots: Array<{ startsAt: string; endsAt: string }>;
+  };
+  assert.ok(slotsPayload.slots.length > 0, "private scheduler offers slots");
+
+  const firstSlot = slotsPayload.slots[0];
+  const booking = await fetch(
+    `${typeBase}/bookings?key=${encodeURIComponent(firstKey)}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        startsAt: firstSlot.startsAt,
+        name: "Private Candidate",
+        email: "private-candidate@example.com",
+      }),
+    },
+  );
+  assert.equal(booking.status, 201, "reusable key can create a booking");
+
+  const stillValid = await fetch(
+    `${typeBase}?key=${encodeURIComponent(firstKey)}`,
+  );
+  assert.equal(stillValid.status, 200, "booking does not consume the reusable key");
+
+  const rotate = await fetch(
+    `${base}/api/hireme/identities/${encodeURIComponent(
+      identityId,
+    )}/access/${encodeURIComponent(slug)}/rotate`,
+    {
+      method: "POST",
+      headers: authed(),
+    },
+  );
+  assert.equal(rotate.status, 200, "existing private link rotates");
+  const rotated = (await rotate.json()) as {
+    inviteUrl: string;
+  };
+  const secondInvite = new URL(rotated.inviteUrl, base);
+  const secondKey = secondInvite.searchParams.get("key") ?? "";
+  assert.ok(secondKey && secondKey !== firstKey, "rotation issues a new key");
+
+  const oldKey = await fetch(
+    `${typeBase}?key=${encodeURIComponent(firstKey)}`,
+  );
+  assert.equal(oldKey.status, 404, "rotation invalidates the old key");
+
+  const newKey = await fetch(
+    `${typeBase}?key=${encodeURIComponent(secondKey)}`,
+  );
+  assert.equal(newKey.status, 200, "rotated key unlocks HireMe");
+});
+
 test("every registered surface answers on the wire", async () => {
   const vcf = await fetch(`${base}/smoketest?format=vcard`);
   assert.equal(vcf.status, 200);
