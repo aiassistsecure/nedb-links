@@ -39,7 +39,17 @@ let transporter: Transporter | null = null;
 function transport(): Transporter | null {
   if (testMode) return null;
   if (transporter) return transporter;
-  if (!config.smtpHost) return null;
+  if (!config.smtpHost) {
+    console.error("[links] mail transport unavailable: SMTP_HOST is not configured");
+    return null;
+  }
+
+  console.info(
+    `[links] mail transport init: host=${config.smtpHost} port=${config.smtpPort} secure=${config.smtpSecure} auth=${
+      config.smtpUser && config.smtpPass ? "configured" : "missing"
+    }`,
+  );
+
   transporter = nodemailer.createTransport({
     host: config.smtpHost,
     port: config.smtpPort,
@@ -66,7 +76,11 @@ export async function sendMail(mail: OutgoingMail): Promise<void> {
   if (!t) {
     throw new Error("mail transport is not configured (SMTP_HOST/SMTP_USER/SMTP_PASS)");
   }
-  await t.sendMail({
+  console.info(
+    `[links] mail send start: to=${mail.to} subject=${JSON.stringify(mail.subject)} from=${config.mailFrom ?? "(unset)"}`,
+  );
+
+  const info = await t.sendMail({
     from: config.mailFrom,
     to: mail.to,
     subject: mail.subject,
@@ -74,4 +88,10 @@ export async function sendMail(mail: OutgoingMail): Promise<void> {
     text: mail.text,
     attachments: mail.attachments,
   });
+
+  console.info(
+    `[links] mail send accepted: to=${mail.to} messageId=${info.messageId || "(none)"} accepted=${JSON.stringify(
+      info.accepted ?? [],
+    )} rejected=${JSON.stringify(info.rejected ?? [])} response=${JSON.stringify(info.response ?? "")}`,
+  );
 }
